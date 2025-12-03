@@ -1,0 +1,44 @@
+# ===================================
+# Python basics
+# ===================================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
+*.pkl
+*.egg-info/
+*.egg
+*.log
+
+# Virtual environments
+.env
+.venv
+venv/
+ENV/
+
+# Dist / build
+build/
+dist/
+wheelhouse/
+
+# Jupyter / Colab
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+*.nbconvert.ipynb
+
+# PyTorch
+*.pt
+*.pth
+
+# System
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+
+# Data
+data/*
+!.gitkeep
