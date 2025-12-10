@@ -52,7 +52,13 @@ def main():
         help="Lista de entropías objetivo por capa",
     )
 
-    parser.add_argument("--device", type=str, default="cpu")
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="auto",
+        choices=["auto", "cpu", "cuda"],
+        help="auto usa CUDA si está disponible",
+    )
     parser.add_argument("--seed", type=int, default=42)
 
     args = parser.parse_args()
@@ -92,7 +98,8 @@ def main():
     print("Target entropies:", target_entropies.tolist())
 
     # --- entrenamiento ---
-    history = train_distillation(
+    device = None if args.device == "auto" else args.device
+    _, history = train_distillation(
         model=model,
         teacher_vectors=teacher_vectors,
         target_entropies=target_entropies,
@@ -100,7 +107,7 @@ def main():
         batch_size=args.batch_size,
         lambda_ent=args.lambda_ent,
         lr=args.lr,
-        device=args.device,
+        device=device,
         log_every=50,
     )
 

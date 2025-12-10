@@ -10,7 +10,7 @@ packages = [{ include = "flse" }]
 # Python requerido (elegí 3.10 o 3.11 si querés)
 # Si venís usando pyenv 3.11.x, dejalo así:
 [tool.poetry.dependencies]
-python = ">=3.10,<3.12"
+python = ">=3.10,<3.13"
 numpy = "^1.26"
 torch = "^2.2"
 

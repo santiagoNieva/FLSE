@@ -11,6 +11,7 @@ def train_distillation(
     lr: float = 1e-2,
     lambda_ent: float = 0.1,
     device: str | None = None,
+    log_every: int | None = None,
 ):
     """
     Entrena el modelo FLSE por distillation sobre todos los índices de vocabulario.
@@ -25,6 +26,8 @@ def train_distillation(
 
     optimizer = optim.Adam(model.parameters(), lr=lr)
     model.train()
+
+    history = {"loss": [], "mse": [], "ent": []}
 
     for epoch in range(epochs):
         perm = torch.randperm(vocab_size, device=device)
@@ -49,11 +52,25 @@ def train_distillation(
             total_mse  += mse.item() * bs
             total_ent  += ent_loss.item() * bs
 
+            if log_every and (i // batch_size) % log_every == 0:
+                print(
+                    f"[epoch {epoch+1} step {i}] "
+                    f"loss={loss.item():.4f} mse={mse.item():.4f} ent={ent_loss.item():.4f}"
+                )
+
+        avg_loss = total_loss / vocab_size
+        avg_mse = total_mse / vocab_size
+        avg_ent = total_ent / vocab_size
+
+        history["loss"].append(avg_loss)
+        history["mse"].append(avg_mse)
+        history["ent"].append(avg_ent)
+
         print(
             f"Epoch {epoch+1}/{epochs} "
-            f"- Total: {total_loss / vocab_size:.4f} "
-            f" MSE: {total_mse / vocab_size:.4f} "
-            f" EntReg: {total_ent / vocab_size:.4f}"
+            f"- Total: {avg_loss:.4f} "
+            f" MSE: {avg_mse:.4f} "
+            f" EntReg: {avg_ent:.4f}"
         )
 
-    return model
+    return model, history

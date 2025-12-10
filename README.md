@@ -116,6 +116,8 @@ Activar entorno:
 source $(poetry env info --path)/bin/activate
 ```
 
+> Requisitos: Python 3.10–3.12 (probado en Colab con 3.12 + CUDA cuando está disponible).
+
 ### Ejecutar tests
 
 ```bash

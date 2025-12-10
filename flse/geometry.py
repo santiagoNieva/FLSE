@@ -4,11 +4,19 @@ import torch
 def _normalize_np(v):
     return v / np.linalg.norm(v, axis=-1, keepdims=True)
 
-def generate_vertices(num_layers: int, verts_per_layer: int, dim: int) -> torch.Tensor:
+def generate_vertices(
+    num_layers: int,
+    verts_per_layer: int,
+    dim: int,
+    seed: int | None = None,
+) -> torch.Tensor:
     """
     Genera vértices esféricos para todas las capas.
     Devuelve tensor (L, V, D) en torch.float32.
     """
+    if seed is not None:
+        np.random.seed(seed)
+
     layers = []
     for _ in range(num_layers):
         vs = np.random.normal(size=(verts_per_layer, dim))

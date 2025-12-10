@@ -87,7 +87,7 @@ def main():
 
     print(f"Entrenando FLSE con vocab={vocab_size}, capas={args.num_layers}, "
           f"verts/capa={args.verts_per_layer}, dim capa={args.dim}, teacher_dim={teacher_dim}")
-    model = train_distillation(
+    model, _ = train_distillation(
         model=model,
         teacher_vectors=teacher_vectors,
         target_entropies=targets,
