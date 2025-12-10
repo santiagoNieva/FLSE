@@ -10,12 +10,21 @@ def train_distillation(
     batch_size: int = 128,
     lr: float = 1e-2,
     lambda_ent: float = 0.1,
-    device: str = "cuda",
+    device: str | None = None,
 ):
+    """
+    Entrena el modelo FLSE por distillation sobre todos los índices de vocabulario.
+    Ajusta automáticamente el dispositivo si no se especifica.
+    """
+    device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
+    teacher_vectors = teacher_vectors.to(device)
+    target_entropies = target_entropies.to(device)
+
     vocab_size = teacher_vectors.size(0)
-    indices = torch.arange(vocab_size, device=device)
 
     optimizer = optim.Adam(model.parameters(), lr=lr)
+    model.train()
 
     for epoch in range(epochs):
         perm = torch.randperm(vocab_size, device=device)
@@ -46,3 +55,5 @@ def train_distillation(
             f" MSE: {total_mse / vocab_size:.4f} "
             f" EntReg: {total_ent / vocab_size:.4f}"
         )
+
+    return model

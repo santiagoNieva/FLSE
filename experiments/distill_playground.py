@@ -1,0 +1,112 @@
+import argparse
+from pathlib import Path
+import numpy as np
+import torch
+
+from flse.geometry import generate_vertices
+from flse.model import FLSEModel
+from flse.training import train_distillation
+from flse.losses import batch_entropy_per_layer
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Playground rápido para distillation FLSE con distintos teachers y parámetros."
+    )
+    parser.add_argument("--teacher-path", type=Path, default=None,
+                        help="Ruta a matriz teacher en .npy (shape: vocab, dim). Si no se pasa, se usa un teacher aleatorio.")
+    parser.add_argument("--vocab-size", type=int, default=None,
+                        help="Tamaño de vocab. Si se carga un .npy se infiere; opcionalmente se puede truncar con este valor.")
+    parser.add_argument("--teacher-dim", type=int, default=64,
+                        help="Dimensión del embedding teacher (solo cuando se usa teacher aleatorio).")
+    parser.add_argument("--num-layers", type=int, default=3)
+    parser.add_argument("--verts-per-layer", type=int, default=16)
+    parser.add_argument("--dim", type=int, default=16, help="Dimensión interna por capa.")
+    parser.add_argument("--epochs", type=int, default=5)
+    parser.add_argument("--batch-size", type=int, default=128)
+    parser.add_argument("--lr", type=float, default=1e-2)
+    parser.add_argument("--lambda-ent", type=float, default=0.1,
+                        help="Peso de la regularización de entropía.")
+    parser.add_argument("--target-entropy", type=float, default=1.5,
+                        help="Valor base de entropía por capa si no se pasa una lista.")
+    parser.add_argument("--target-entropies", type=float, nargs="+", default=None,
+                        help="Lista de entropías objetivo por capa; debe coincidir con num_layers.")
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
+    parser.add_argument("--seed", type=int, default=42)
+    return parser.parse_args()
+
+
+def prepare_teacher(args: argparse.Namespace) -> tuple[torch.Tensor, int, int]:
+    if args.teacher_path:
+        if not args.teacher_path.exists():
+            raise FileNotFoundError(f"No encontré el archivo {args.teacher_path}")
+        data = np.load(args.teacher_path)
+        if data.ndim != 2:
+            raise ValueError("El teacher debe ser una matriz 2D (vocab, dim).")
+        teacher_vectors = torch.tensor(data, dtype=torch.float32)
+        vocab_size = teacher_vectors.shape[0]
+        teacher_dim = teacher_vectors.shape[1]
+        if args.vocab_size:
+            vocab_size = min(args.vocab_size, vocab_size)
+            teacher_vectors = teacher_vectors[:vocab_size]
+    else:
+        if args.vocab_size is None:
+            raise ValueError("Cuando no pasás --teacher-path, especificá --vocab-size.")
+        torch.manual_seed(args.seed)
+        teacher_vectors = torch.randn(args.vocab_size, args.teacher_dim)
+        vocab_size = args.vocab_size
+        teacher_dim = args.teacher_dim
+
+    return teacher_vectors, vocab_size, teacher_dim
+
+
+def build_target_entropies(args: argparse.Namespace, num_layers: int) -> torch.Tensor:
+    if args.target_entropies is not None:
+        entropies = torch.tensor(args.target_entropies, dtype=torch.float32)
+        if entropies.numel() != num_layers:
+            raise ValueError("target-entropies debe tener exactamente num_layers valores.")
+        return entropies
+    return torch.full((num_layers,), args.target_entropy, dtype=torch.float32)
+
+
+def main():
+    args = parse_args()
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+
+    teacher_vectors, vocab_size, teacher_dim = prepare_teacher(args)
+    vertices = generate_vertices(
+        num_layers=args.num_layers,
+        verts_per_layer=args.verts_per_layer,
+        dim=args.dim,
+    )
+    model = FLSEModel(vocab_size=vocab_size, vertices=vertices, teacher_dim=teacher_dim)
+
+    targets = build_target_entropies(args, args.num_layers)
+    device = None if args.device == "auto" else args.device
+
+    print(f"Entrenando FLSE con vocab={vocab_size}, capas={args.num_layers}, "
+          f"verts/capa={args.verts_per_layer}, dim capa={args.dim}, teacher_dim={teacher_dim}")
+    model = train_distillation(
+        model=model,
+        teacher_vectors=teacher_vectors,
+        target_entropies=targets,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        lr=args.lr,
+        lambda_ent=args.lambda_ent,
+        device=device,
+    )
+
+    sample = torch.arange(min(8, vocab_size), device=model.logits.device)
+    with torch.no_grad():
+        ent = batch_entropy_per_layer(model, sample)
+        emb = model.flse_embedding(sample).cpu()
+
+    print("\nEntropías promedio por capa en la muestra:", ent.cpu().tolist())
+    print("Embedding fractal de la primera palabra (flatten):")
+    print(emb[0].tolist())
+
+
+if __name__ == "__main__":
+    main()
