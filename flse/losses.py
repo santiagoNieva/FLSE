@@ -11,7 +11,11 @@ def batch_entropy_per_layer(model, batch_idx: torch.Tensor) -> torch.Tensor:
     Devuelve (L,)
     """
     logits = model.logits[batch_idx]               # (B, L, V)
-    weights = F.softmax(logits, dim=-1)            # (B, L, V)
+    temps = getattr(model, "logit_temps", None)
+    if temps is not None:
+        weights = F.softmax(logits * temps.view(1, -1, 1), dim=-1)
+    else:
+        weights = F.softmax(logits, dim=-1)        # (B, L, V)
     ent = -torch.sum(weights * torch.log(weights + 1e-9), dim=-1)  # (B, L)
     return ent.mean(dim=0)
 

@@ -29,6 +29,8 @@ def parse_args() -> argparse.Namespace:
                         help="Peso de la regularización de entropía.")
     parser.add_argument("--lambda-entropies", type=float, nargs="+", default=None,
                         help="Lista de pesos de entropía por capa (opcional). Debe coincidir con num_layers.")
+    parser.add_argument("--logit-temps", type=float, nargs="+", default=None,
+                        help="Temperaturas por capa para escalar los logits antes del softmax. Largo = num_layers.")
     parser.add_argument("--target-entropy", type=float, default=1.5,
                         help="Valor base de entropía por capa si no se pasa una lista.")
     parser.add_argument("--target-entropies", type=float, nargs="+", default=None,
@@ -82,6 +84,15 @@ def build_lambda_entropies(args: argparse.Namespace, num_layers: int) -> torch.T
     return weights
 
 
+def build_logit_temps(args: argparse.Namespace, num_layers: int) -> torch.Tensor | None:
+    if args.logit_temps is None:
+        return None
+    temps = torch.tensor(args.logit_temps, dtype=torch.float32)
+    if temps.numel() != num_layers:
+        raise ValueError("logit-temps debe tener exactamente num_layers valores.")
+    return temps
+
+
 def main():
     args = parse_args()
     np.random.seed(args.seed)
@@ -93,7 +104,13 @@ def main():
         verts_per_layer=args.verts_per_layer,
         dim=args.dim,
     )
-    model = FLSEModel(vocab_size=vocab_size, vertices=vertices, teacher_dim=teacher_dim)
+    logit_temps = build_logit_temps(args, args.num_layers)
+    model = FLSEModel(
+        vocab_size=vocab_size,
+        vertices=vertices,
+        teacher_dim=teacher_dim,
+        logit_temps=logit_temps,
+    )
 
     targets = build_target_entropies(args, args.num_layers)
     lambda_ents = build_lambda_entropies(args, args.num_layers)
@@ -134,6 +151,7 @@ def main():
                 "target_entropies": targets.cpu().tolist(),
                 "lambda_ent": args.lambda_ent,
                 "lambda_entropies": None if lambda_ents is None else lambda_ents.cpu().tolist(),
+                "logit_temps": None if logit_temps is None else logit_temps.cpu().tolist(),
             },
         }
         torch.save(ckpt, args.save_path)
