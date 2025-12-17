@@ -35,6 +35,8 @@ def parse_args() -> argparse.Namespace:
                         help="Lista de entropías objetivo por capa; debe coincidir con num_layers.")
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--save-path", type=Path, default=None,
+                        help="Ruta para guardar el checkpoint del modelo (state_dict y config).")
     return parser.parse_args()
 
 
@@ -120,7 +122,23 @@ def main():
     print("Embedding fractal de la primera palabra (flatten):")
     print(emb[0].tolist())
 
+    if args.save_path:
+        ckpt = {
+            "state_dict": model.state_dict(),
+            "config": {
+                "vocab_size": vocab_size,
+                "num_layers": args.num_layers,
+                "verts_per_layer": args.verts_per_layer,
+                "dim": args.dim,
+                "teacher_dim": teacher_dim,
+                "target_entropies": targets.cpu().tolist(),
+                "lambda_ent": args.lambda_ent,
+                "lambda_entropies": None if lambda_ents is None else lambda_ents.cpu().tolist(),
+            },
+        }
+        torch.save(ckpt, args.save_path)
+        print(f"\nGuardado checkpoint en {args.save_path}")
+
 
 if __name__ == "__main__":
     main()
-
