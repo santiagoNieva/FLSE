@@ -10,6 +10,7 @@ def train_distillation(
     batch_size: int = 128,
     lr: float = 1e-2,
     lambda_ent: float = 0.1,
+    lambda_entropies: torch.Tensor | None = None,
     device: str | None = None,
     log_every: int | None = None,
 ):
@@ -21,6 +22,7 @@ def train_distillation(
     model = model.to(device)
     teacher_vectors = teacher_vectors.to(device)
     target_entropies = target_entropies.to(device)
+    lambda_entropies = lambda_entropies.to(device) if lambda_entropies is not None else None
 
     vocab_size = teacher_vectors.size(0)
 
@@ -43,6 +45,7 @@ def train_distillation(
                 teacher_vectors,
                 target_entropies,
                 lambda_ent=lambda_ent,
+                lambda_entropies=lambda_entropies,
             )
             loss.backward()
             optimizer.step()

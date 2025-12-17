@@ -27,6 +27,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lr", type=float, default=1e-2)
     parser.add_argument("--lambda-ent", type=float, default=0.1,
                         help="Peso de la regularización de entropía.")
+    parser.add_argument("--lambda-entropies", type=float, nargs="+", default=None,
+                        help="Lista de pesos de entropía por capa (opcional). Debe coincidir con num_layers.")
     parser.add_argument("--target-entropy", type=float, default=1.5,
                         help="Valor base de entropía por capa si no se pasa una lista.")
     parser.add_argument("--target-entropies", type=float, nargs="+", default=None,
@@ -69,6 +71,15 @@ def build_target_entropies(args: argparse.Namespace, num_layers: int) -> torch.T
     return torch.full((num_layers,), args.target_entropy, dtype=torch.float32)
 
 
+def build_lambda_entropies(args: argparse.Namespace, num_layers: int) -> torch.Tensor | None:
+    if args.lambda_entropies is None:
+        return None
+    weights = torch.tensor(args.lambda_entropies, dtype=torch.float32)
+    if weights.numel() != num_layers:
+        raise ValueError("lambda-entropies debe tener exactamente num_layers valores.")
+    return weights
+
+
 def main():
     args = parse_args()
     np.random.seed(args.seed)
@@ -83,6 +94,7 @@ def main():
     model = FLSEModel(vocab_size=vocab_size, vertices=vertices, teacher_dim=teacher_dim)
 
     targets = build_target_entropies(args, args.num_layers)
+    lambda_ents = build_lambda_entropies(args, args.num_layers)
     device = None if args.device == "auto" else args.device
 
     print(f"Entrenando FLSE con vocab={vocab_size}, capas={args.num_layers}, "
@@ -95,6 +107,7 @@ def main():
         batch_size=args.batch_size,
         lr=args.lr,
         lambda_ent=args.lambda_ent,
+        lambda_entropies=lambda_ents,
         device=device,
     )
 
@@ -110,3 +123,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
